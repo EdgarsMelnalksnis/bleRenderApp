@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BLE Tracker Search</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container py-5">
+    <h1 class="mb-4">BLE Tracker Search</h1>
+
+    <!-- MAC SEARCH FORM -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" action="/mac">
+                <h4 class="mb-3">Search by MAC Address</h4>
+
+                <div class="mb-3">
+                    <label class="form-label">MAC Address</label>
+                    <select name="mac" class="form-select" required>
+                        {% for mac in macs %}
+                            {% set name = mac_stats.get(mac, {}).get('name', '') %}
+                            <option value="{{ mac }}">{{ mac }}{% if name %} ({{ name }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Filter by Hubs</label><br>
+                    {% for hub in hubs %}
+		        {% set hub_name = hub_stats.get(hub, {}).get('name', '') %}
+        		<div class="form-check form-check-inline">
+            			<input type="checkbox" name="hub" value="{{ hub }}" class="form-check-input">
+            			<label class="form-check-label">
+                			{{ hub }}{% if hub_name %} ({{ hub_name }}){% endif %}
+            			</label>
+        		</div>
+                    {% endfor %}
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Time Filter</label><br>
+                    {% set filters = ["today", "yesterday", "this_week", "last_week", "all"] %}
+                    {% for option in filters %}
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="time_filter" value="{{ option }}" {% if request.args.get('time_filter', 'all') == option %}checked{% endif %}>
+                            <label class="form-check-label">{{ option.replace('_', ' ').title() }}</label>
+                        </div>
+                    {% endfor %}
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="time_filter" value="custom">
+                        <label class="form-check-label">Custom</label>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col">
+                        <label>From Date</label>
+                        <input type="date" name="from_date" class="form-control">
+                    </div>
+                    <div class="col">
+                        <label>To Date</label>
+                        <input type="date" name="to_date" class="form-control">
+                    </div>
+                    <div class="col">
+                        <label>From Time</label>
+                        <input type="time" name="from_time" class="form-control">
+                    </div>
+                    <div class="col">
+                        <label>To Time</label>
+                        <input type="time" name="to_time" class="form-control">
+                    </div>
+                </div>
+
+                <button class="btn btn-primary">Search by MAC</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- HUB SEARCH FORM -->
+    <div class="card mb-5">
+        <div class="card-body">
+            <form method="get" action="/hub">
+                <h4 class="mb-3">Search by Hub</h4>
+
+                <div class="mb-3">
+                    <label class="form-label">Hub</label>
+                    <select name="hub" class="form-select" required>
+                        {% for hub in hubs %}
+                            {% set name = hub_stats.get(hub, {}).get('name', '') %}
+                            <option value="{{ hub }}">{{ hub }}{% if name %} ({{ name }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col">
+                        <label>From Date</label>
+                        <input type="date" name="from_date" class="form-control">
+                    </div>
+                    <div class="col">
+                        <label>To Date</label>
+                        <input type="date" name="to_date" class="form-control">
+                    </div>
+                    <div class="col">
+                        <label>From Time</label>
+                        <input type="time" name="from_time" class="form-control">
+                    </div>
+                    <div class="col">
+                        <label>To Time</label>
+                        <input type="time" name="to_time" class="form-control">
+                    </div>
+                </div>
+
+                <button class="btn btn-success">Search by Hub</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAC RENAME TABLE -->
+    <h3 class="mb-3">MAC Rename & Stats</h3>
+    <form method="post" action="/rename">
+        <table class="table table-bordered table-sm table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>MAC</th>
+                    <th>Name</th>
+                    <th>Last Seen</th>
+                    <th>Seen Today</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for mac, info in mac_stats.items() %}
+                <tr>
+                    <td>{{ mac }}</td>
+                    <td><input type="text" class="form-control" name="rename_{{ mac }}" value="{{ info.name }}"></td>
+                    <td>{{ info.last_seen }}</td>
+                    <td>{{ info.today_count }}</td>
+                    <td>{{ info.total_count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <button class="btn btn-primary">💾 Save MAC Names</button>
+    </form>
+
+    <!-- HUB RENAME TABLE -->
+    <h3 class="mt-5 mb-3">Hub Rename & Stats</h3>
+    <form method="post" action="/rename_hubs">
+        <table class="table table-bordered table-sm table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>Hub</th>
+                    <th>Name</th>
+                    <th>Last Seen</th>
+                    <th>Seen Today</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for hub, info in hub_stats.items() %}
+                <tr>
+                    <td>{{ hub }}</td>
+                    <td><input type="text" class="form-control" name="renamehub_{{ hub }}" value="{{ info.name }}"></td>
+                    <td>{{ info.last_seen }}</td>
+                    <td>{{ info.today_count }}</td>
+                    <td>{{ info.total_count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <button class="btn btn-success">💾 Save Hub Names</button>
+    </form>
+
+</div>
+</body>
+</html>
+
