@@ -16,12 +16,11 @@ SCOPES = ['https://www.googleapis.com/auth/drive.file']
 DRIVE_FOLDER_ID = "1NFAKM3Q66EQJAtDiVNvKmPbbwUYtB6qh"
 
 def get_drive_service():
-    creds = None
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    else:
-        raise RuntimeError("Missing token.json. Run auth flow to generate it.")
-    return build('drive', 'v3', credentials=creds)
+    import googleapiclient.discovery
+    creds_data = json.loads(os.environ['GOOGLE_CREDENTIALS_JSON'])
+    token_data = json.loads(os.environ['GOOGLE_TOKEN_JSON'])
+    creds = Credentials.from_authorized_user_info(token_data)
+    return googleapiclient.discovery.build('drive', 'v3', credentials=creds)
 
 def get_drive_file_map():
     service = get_drive_service()
