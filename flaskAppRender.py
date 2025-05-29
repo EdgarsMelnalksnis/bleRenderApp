@@ -22,6 +22,25 @@ def get_drive_service():
     creds = Credentials.from_authorized_user_info(token_data)
     return googleapiclient.discovery.build('drive', 'v3', credentials=creds)
 
+def load_latest_logs_from_drive():
+    log_files = get_drive_file_map()
+    combined_logs = []
+    for hub, file_id in log_files.items():
+        try:
+            df = download_csv_from_drive(file_id)
+            df["hub"] = hub
+            df["time"] = pd.to_datetime(df["timestamp"], unit="s")
+            df = df.drop_duplicates(subset=["mac", "time", "hub", "rssi"])
+            combined_logs.append(df)
+        except Exception as e:
+            print(f"Failed to load log for {hub}: {e}")
+    if combined_logs:
+        full_df = pd.concat(combined_logs).sort_values(["mac", "time"])
+        full_df["time_diff"] = full_df.groupby("mac")["time"].diff().fillna(pd.Timedelta(seconds=0))
+        full_df["time_diff"] = full_df["time_diff"].apply(lambda x: str(x).split('.')[0])
+        return full_df
+    return pd.DataFrame()
+
 def get_drive_file_map():
     service = get_drive_service()
     results = service.files().list(
@@ -145,6 +164,7 @@ def compute_hub_stats():
 # === Routes ===
 @app.route("/")
 def index():
+    df = load_latest_logs_from_drive()
     return render_template("index.html",
         macs=valid_macs,
         hubs=all_hubs,
