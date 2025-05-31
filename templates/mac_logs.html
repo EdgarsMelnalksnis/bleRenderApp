@@ -38,8 +38,10 @@
         </tbody>
     </table>
     <div style="margin-top: 20px;">
-  <a href="{{ request.url.replace('/mac', '/mac/download') }}" class="btn btn-outline-primary">⬇️ Download CSV</a>
-  <a href="{{ request.url.replace('/mac', '/mac/download_pdf') }}" class="btn btn-outline-danger">⬇️ Download PDF</a>
+  <a href="{{ url_for('download_mac_logs', mac=mac, hub=request.args.getlist('hub'), time_filter=request.args.get('time_filter'), from_date=request.args.get('from_date'), to_date=request.args.get('to_date'), from_time=request.args.get('from_time'), to_time=request.args.get('to_time')) }}" class="btn btn-primary" target="_blank">Download CSV</a>
+
+<a href="{{ url_for('download_mac_logs_pdf', mac=mac, hub=request.args.getlist('hub'), time_filter=request.args.get('time_filter'), from_date=request.args.get('from_date'), to_date=request.args.get('to_date'), from_time=request.args.get('from_time'), to_time=request.args.get('to_time')) }}" class="btn btn-secondary ms-2" target="_blank">Download PDF</a>
+
 </div>
 </div>
 </body>

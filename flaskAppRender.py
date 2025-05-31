@@ -313,14 +313,19 @@ def download_hub_logs_pdf():
 
     columns = df.columns.tolist()
     pdf.set_font("Arial", size=8)
-    pdf.multi_cell(0, 5, "\t".join(columns))
+    col_header = " | ".join(columns)
+    pdf.multi_cell(0, 5, col_header)
 
     for _, row in df.iterrows():
-        values = [str(row[col]) for col in columns]
-        pdf.multi_cell(0, 5, "\t".join(values))
+        values = [str(row[col])[:20].replace("\n", " ").replace("|", "/") for col in columns]
+        line = " | ".join(values)
+        if pdf.get_string_width(line) > 190:
+            line = line[:180] + "..."
+        pdf.multi_cell(0, 5, line)
 
     output = BytesIO()
-    pdf.output(output)
+    pdf_bytes = pdf.output(dest='S').encode('latin1')
+    output.write(pdf_bytes)
     output.seek(0)
     return send_file(output, as_attachment=True, download_name=f"{hub}_logs.pdf", mimetype="application/pdf")
 
