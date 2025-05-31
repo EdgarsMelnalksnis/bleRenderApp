@@ -7,7 +7,7 @@ from io import BytesIO
 
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
+from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
 app = Flask(__name__)
 
@@ -16,30 +16,54 @@ SCOPES = ['https://www.googleapis.com/auth/drive.file']
 DRIVE_FOLDER_ID = "1NFAKM3Q66EQJAtDiVNvKmPbbwUYtB6qh"
 
 def get_drive_service():
-    import googleapiclient.discovery
-    creds_data = json.loads(os.environ['GOOGLE_CREDENTIALS_JSON'])
-    token_data = json.loads(os.environ['GOOGLE_TOKEN_JSON'])
-    creds = Credentials.from_authorized_user_info(token_data)
-    return googleapiclient.discovery.build('drive', 'v3', credentials=creds)
+    from google_auth_oauthlib.flow import InstalledAppFlow
+    if 'GOOGLE_CREDENTIALS_JSON' in os.environ and 'GOOGLE_TOKEN_JSON' in os.environ:
+        creds_data = json.loads(os.environ['GOOGLE_CREDENTIALS_JSON'])
+        token_data = json.loads(os.environ['GOOGLE_TOKEN_JSON'])
+        creds = Credentials.from_authorized_user_info(token_data)
+    else:
+        if os.path.exists("token.json"):
+            creds = Credentials.from_authorized_user_file("token.json", SCOPES)
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
+            creds = flow.run_local_server(port=0)
+            with open("token.json", "w") as token_file:
+                token_file.write(creds.to_json())
+    return build('drive', 'v3', credentials=creds)
 
-def load_latest_logs_from_drive():
-    log_files = get_drive_file_map()
-    combined_logs = []
-    for hub, file_id in log_files.items():
-        try:
-            df = download_csv_from_drive(file_id)
-            df["hub"] = hub
-            df["time"] = pd.to_datetime(df["timestamp"], unit="s")
-            df = df.drop_duplicates(subset=["mac", "time", "hub", "rssi"])
-            combined_logs.append(df)
-        except Exception as e:
-            print(f"Failed to load log for {hub}: {e}")
-    if combined_logs:
-        full_df = pd.concat(combined_logs).sort_values(["mac", "time"])
-        full_df["time_diff"] = full_df.groupby("mac")["time"].diff().fillna(pd.Timedelta(seconds=0))
-        full_df["time_diff"] = full_df["time_diff"].apply(lambda x: str(x).split('.')[0])
-        return full_df
-    return pd.DataFrame()
+def find_drive_file(name):
+    service = get_drive_service()
+    results = service.files().list(
+        q=f"'{DRIVE_FOLDER_ID}' in parents and name = '{name}' and trashed = false",
+        fields="files(id, name)"
+    ).execute()
+    files = results.get('files', [])
+    return files[0]['id'] if files else None
+
+def download_json_from_drive(name):
+    file_id = find_drive_file(name)
+    if not file_id:
+        return {}
+    service = get_drive_service()
+    request = service.files().get_media(fileId=file_id)
+    fh = BytesIO()
+    downloader = MediaIoBaseDownload(fh, request)
+    done = False
+    while not done:
+        status, done = downloader.next_chunk()
+    fh.seek(0)
+    return json.load(fh)
+
+def upload_json_to_drive(name, content):
+    service = get_drive_service()
+    file_id = find_drive_file(name)
+    fh = BytesIO(json.dumps(content, indent=2).encode("utf-8"))
+    media = MediaIoBaseUpload(fh, mimetype='application/json', resumable=True)
+    if file_id:
+        service.files().update(fileId=file_id, media_body=media).execute()
+    else:
+        file_metadata = {"name": name, "parents": [DRIVE_FOLDER_ID]}
+        service.files().create(body=file_metadata, media_body=media, fields='id').execute()
 
 def get_drive_file_map():
     service = get_drive_service()
@@ -61,44 +85,37 @@ def download_csv_from_drive(file_id):
     fh.seek(0)
     return pd.read_csv(fh)
 
-# === Load logs from Google Drive ===
-log_files = get_drive_file_map()
-combined_logs = []
-for hub, file_id in log_files.items():
-    try:
-        df = download_csv_from_drive(file_id)
-        df["hub"] = hub
-        df["time"] = pd.to_datetime(df["timestamp"], unit="s")
-        df = df.drop_duplicates(subset=["mac", "time", "hub", "rssi"])
-        combined_logs.append(df)
-    except Exception as e:
-        print(f"❌ Failed to load log for {hub}: {e}")
+def load_latest_logs_from_drive():
+    log_files = get_drive_file_map()
+    combined_logs = []
+    for hub, file_id in log_files.items():
+        try:
+            df = download_csv_from_drive(file_id)
+            df["hub"] = hub
+            df["time"] = pd.to_datetime(df["timestamp"], unit="s")
+            df = df.drop_duplicates(subset=["mac", "time", "hub", "rssi"])
+            combined_logs.append(df)
+        except Exception as e:
+            print(f"Failed to load log for {hub}: {e}")
+    if combined_logs:
+        full_df = pd.concat(combined_logs).sort_values(["mac", "time"])
+        full_df["time_diff"] = full_df.groupby("mac")["time"].diff().fillna(pd.Timedelta(seconds=0))
+        full_df["time_diff"] = full_df["time_diff"].apply(lambda x: str(x).split('.')[0])
+        return full_df
+    return pd.DataFrame()
 
-full_df = pd.concat(combined_logs) if combined_logs else pd.DataFrame()
-full_df = full_df.sort_values(["mac", "time"])
-full_df["time_diff"] = full_df.groupby("mac")["time"].diff().fillna(pd.Timedelta(seconds=0))
-full_df["time_diff"] = full_df["time_diff"].apply(lambda x: str(x).split('.')[0])
-
+full_df = load_latest_logs_from_drive()
 all_hubs = sorted(full_df["hub"].unique()) if not full_df.empty else []
 valid_macs = sorted(full_df["mac"].unique()) if not full_df.empty else []
+mac_name_map = download_json_from_drive("mac_names.json")
+hub_name_map = download_json_from_drive("hub_names.json")
 
-# === MAC and HUB rename maps ===
-MAC_NAME_FILE = "mac_names.json"
-HUB_NAME_FILE = "hub_names.json"
-mac_name_map = json.load(open(MAC_NAME_FILE)) if os.path.exists(MAC_NAME_FILE) else {}
-hub_name_map = json.load(open(HUB_NAME_FILE)) if os.path.exists(HUB_NAME_FILE) else {}
-
-# === Helper functions ===
 def filter_by_time(df, time_filter, from_date=None, to_date=None, from_time=None, to_time=None):
     now = datetime.now()
-
     def combine_date_time(date_str, time_str, default_time):
         try:
             base = datetime.strptime(date_str, "%Y-%m-%d")
-            if time_str:
-                t = datetime.strptime(time_str, "%H:%M").time()
-            else:
-                t = default_time
+            t = datetime.strptime(time_str, "%H:%M").time() if time_str else default_time
             return datetime.combine(base.date(), t)
         except:
             return None
@@ -107,26 +124,21 @@ def filter_by_time(df, time_filter, from_date=None, to_date=None, from_time=None
         start = combine_date_time(from_date, from_time, datetime.min.time()) if from_date else df["time"].min()
         end = combine_date_time(to_date, to_time, datetime.max.time()) if to_date else df["time"].max()
         return df[(df["time"] >= start) & (df["time"] <= end)]
-
     elif time_filter == "today":
         start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         return df[df["time"] >= start]
-
     elif time_filter == "yesterday":
         start = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
         end = start + timedelta(days=1)
         return df[(df["time"] >= start) & (df["time"] < end)]
-
     elif time_filter == "this_week":
         start = now - timedelta(days=now.weekday())
         start = start.replace(hour=0, minute=0, second=0, microsecond=0)
         return df[df["time"] >= start]
-
     elif time_filter == "last_week":
         start = now - timedelta(days=now.weekday() + 7)
         end = start + timedelta(days=7)
         return df[(df["time"] >= start) & (df["time"] < end)]
-
     return df
 
 def compute_mac_stats():
@@ -161,16 +173,22 @@ def compute_hub_stats():
         }
     return stats
 
-# === Routes ===
 @app.route("/")
 def index():
-    df = load_latest_logs_from_drive()
     return render_template("index.html",
         macs=valid_macs,
         hubs=all_hubs,
         mac_stats=compute_mac_stats(),
         hub_stats=compute_hub_stats()
     )
+
+@app.route("/refresh_logs")
+def refresh_logs():
+    global full_df, all_hubs, valid_macs
+    full_df = load_latest_logs_from_drive()
+    all_hubs[:] = sorted(full_df["hub"].unique()) if not full_df.empty else []
+    valid_macs[:] = sorted(full_df["mac"].unique()) if not full_df.empty else []
+    return redirect("/")
 
 @app.route("/mac")
 def mac_logs():
@@ -222,8 +240,7 @@ def rename():
         if key.startswith("rename_"):
             mac = key.replace("rename_", "")
             mac_name_map[mac] = value.strip()
-    with open(MAC_NAME_FILE, "w") as f:
-        json.dump(mac_name_map, f, indent=2)
+    upload_json_to_drive("mac_names.json", mac_name_map)
     return redirect("/")
 
 @app.route("/rename_hubs", methods=["POST"])
@@ -232,8 +249,7 @@ def rename_hubs():
         if key.startswith("renamehub_"):
             hub = key.replace("renamehub_", "")
             hub_name_map[hub] = value.strip()
-    with open(HUB_NAME_FILE, "w") as f:
-        json.dump(hub_name_map, f, indent=2)
+    upload_json_to_drive("hub_names.json", hub_name_map)
     return redirect("/")
 
 if __name__ == "__main__":
