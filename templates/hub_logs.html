@@ -37,6 +37,10 @@
             {% endfor %}
         </tbody>
     </table>
+   <div style="margin-top: 20px;">
+  <a href="{{ request.url.replace('/hub', '/hub/download') }}" class="btn btn-outline-primary">⬇️ Download CSV</a>
+  <a href="{{ request.url.replace('/hub', '/hub/download_pdf') }}" class="btn btn-outline-danger">⬇️ Download PDF</a>
+</div>
 </div>
 </body>
 </html>

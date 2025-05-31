@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, send_file
 import pandas as pd
 from datetime import datetime, timedelta
 import os
 import json
 from io import BytesIO
+from fpdf import FPDF
 
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -213,6 +214,116 @@ def mac_logs():
         mac_stats=compute_mac_stats(),
         hub_stats=compute_hub_stats()
     )
+
+@app.route("/mac/download")
+def download_mac_logs():
+    mac = request.args.get("mac")
+    hubs = request.args.getlist("hub")
+    time_filter = request.args.get("time_filter")
+    from_date = request.args.get("from_date")
+    to_date = request.args.get("to_date")
+    from_time = request.args.get("from_time")
+    to_time = request.args.get("to_time")
+
+    df = full_df[full_df["mac"] == mac]
+    if hubs:
+        df = df[df["hub"].isin(hubs)]
+    df = filter_by_time(df, time_filter, from_date, to_date, from_time, to_time)
+    df = df.sort_values("time")
+
+    output = BytesIO()
+    df.to_csv(output, index=False)
+    output.seek(0)
+    return send_file(output, as_attachment=True, download_name=f"{mac}_logs.csv", mimetype="text/csv")
+
+@app.route("/mac/download_pdf")
+def download_mac_logs_pdf():
+    mac = request.args.get("mac")
+    hubs = request.args.getlist("hub")
+    time_filter = request.args.get("time_filter")
+    from_date = request.args.get("from_date")
+    to_date = request.args.get("to_date")
+    from_time = request.args.get("from_time")
+    to_time = request.args.get("to_time")
+
+    df = full_df[full_df["mac"] == mac]
+    if hubs:
+        df = df[df["hub"].isin(hubs)]
+    df = filter_by_time(df, time_filter, from_date, to_date, from_time, to_time)
+    df = df.sort_values("time")
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt=f"MAC: {mac} Log Export", ln=True, align='L')
+
+    columns = df.columns.tolist()
+    pdf.set_font("Arial", size=8)
+    col_header = " | ".join(columns)
+    pdf.multi_cell(0, 5, col_header)
+
+    for _, row in df.iterrows():
+        values = [str(row[col])[:20].replace("\n", " ").replace("|", "/") for col in columns]
+        line = " | ".join(values)
+        if pdf.get_string_width(line) > 190:
+            line = line[:180] + "..."
+        pdf.multi_cell(0, 5, line)
+
+    output = BytesIO()
+    pdf_bytes = pdf.output(dest='S').encode('latin1')
+    output.write(pdf_bytes)
+    output.seek(0)
+    return send_file(output, as_attachment=True, download_name=f"{mac}_logs.pdf", mimetype="application/pdf")
+
+@app.route("/hub/download")
+def download_hub_logs():
+    hub = request.args.get("hub")
+    time_filter = request.args.get("time_filter")
+    from_date = request.args.get("from_date")
+    to_date = request.args.get("to_date")
+    from_time = request.args.get("from_time")
+    to_time = request.args.get("to_time")
+
+    df = full_df[full_df["hub"] == hub]
+    df = filter_by_time(df, time_filter, from_date, to_date, from_time, to_time)
+    df = df.sort_values("time")
+
+    output = BytesIO()
+    df.to_csv(output, index=False)
+    output.seek(0)
+    return send_file(output, as_attachment=True, download_name=f"{hub}_logs.csv", mimetype="text/csv")
+
+@app.route("/hub/download_pdf")
+def download_hub_logs_pdf():
+    hub = request.args.get("hub")
+    time_filter = request.args.get("time_filter")
+    from_date = request.args.get("from_date")
+    to_date = request.args.get("to_date")
+    from_time = request.args.get("from_time")
+    to_time = request.args.get("to_time")
+
+    df = full_df[full_df["hub"] == hub]
+    df = filter_by_time(df, time_filter, from_date, to_date, from_time, to_time)
+    df = df.sort_values("time")
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt=f"HUB: {hub} Log Export", ln=True, align='L')
+
+    columns = df.columns.tolist()
+    pdf.set_font("Arial", size=8)
+    pdf.multi_cell(0, 5, "\t".join(columns))
+
+    for _, row in df.iterrows():
+        values = [str(row[col]) for col in columns]
+        pdf.multi_cell(0, 5, "\t".join(values))
+
+    output = BytesIO()
+    pdf.output(output)
+    output.seek(0)
+    return send_file(output, as_attachment=True, download_name=f"{hub}_logs.pdf", mimetype="application/pdf")
+
 
 @app.route("/hub")
 def hub_logs():
