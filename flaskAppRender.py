@@ -180,7 +180,9 @@ def index():
         macs=valid_macs,
         hubs=all_hubs,
         mac_stats=compute_mac_stats(),
-        hub_stats=compute_hub_stats()
+        hub_stats=compute_hub_stats(),
+        mac_name_map=mac_name_map,
+        hub_name_map=hub_name_map
     )
 
 @app.route("/refresh_logs")
@@ -367,6 +369,99 @@ def rename_hubs():
             hub_name_map[hub] = value.strip()
     upload_json_to_drive("hub_names.json", hub_name_map)
     return redirect("/")
+
+
+@app.route('/report', methods=['POST'])
+def generate_report():
+    selected_hubs = request.form.getlist('hubs')
+    selected_macs = request.form.getlist('macs')
+    report_date = request.form.get('report_date')
+
+    if not selected_hubs or not selected_macs or not report_date:
+        return "Missing data", 400
+
+    # Filter data for that date
+    report_day = datetime.strptime(report_date, "%Y-%m-%d").date()
+    df_filtered = full_df[
+        (full_df["hub"].isin(selected_hubs)) &
+        (full_df["mac"].isin(selected_macs)) &
+        (full_df["time"].dt.date == report_day)
+    ]
+
+    # Prepare count table
+    report_data = []
+    for mac in selected_macs:
+        row = {"mac": mac, "counts": {}, "total": 0}
+        for hub in selected_hubs:
+            count = df_filtered[(df_filtered["mac"] == mac) & (df_filtered["hub"] == hub)].shape[0]
+            row["counts"][hub] = count
+            row["total"] += count
+        report_data.append(row)
+
+    return render_template("report_result.html",
+        report_date=report_date,
+        hubs=selected_hubs,
+        report_data=report_data,
+        selected_hubs=selected_hubs,
+        selected_macs=selected_macs
+    ,
+        mac_name_map=mac_name_map,
+        hub_name_map=hub_name_map)
+
+
+
+@app.route("/report/download_pdf")
+def download_report_pdf():
+    from fpdf import FPDF
+
+    date = request.args.get("date")
+    hubs = request.args.get("hubs", "").split(",")
+    macs = request.args.get("macs", "").split(",")
+
+    if not date or not hubs or not macs:
+        return "Missing parameters", 400
+
+    report_day = datetime.strptime(date, "%Y-%m-%d").date()
+    df_filtered = full_df[
+        (full_df["hub"].isin(hubs)) &
+        (full_df["mac"].isin(macs)) &
+        (full_df["time"].dt.date == report_day)
+    ]
+
+    # Generate report data
+    report_data = []
+    for mac in macs:
+        row = {"mac": mac, "counts": {}, "total": 0}
+        for hub in hubs:
+            count = df_filtered[(df_filtered["mac"] == mac) & (df_filtered["hub"] == hub)].shape[0]
+            row["counts"][hub] = count
+            row["total"] += count
+        report_data.append(row)
+
+    # Create PDF
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt=f"MAC Report for {date}", ln=True, align='L')
+
+    header = ["MAC Address"] + hubs + ["Total"]
+    pdf.set_font("Arial", size=9)
+    pdf.cell(0, 8, txt=" | ".join(header), ln=True)
+
+    for row in report_data:
+        values = [row["mac"]] + [str(row["counts"].get(hub, 0)) for hub in hubs] + [str(row["total"])]
+        line = " | ".join(values)
+        if pdf.get_string_width(line) > 190:
+            line = line[:180] + "..."
+        pdf.multi_cell(0, 8, line)
+
+    output = BytesIO()
+    pdf_bytes = pdf.output(dest='S').encode('latin1')
+    output.write(pdf_bytes)
+    output.seek(0)
+    return send_file(output, as_attachment=True, download_name=f"mac_report_{date}.pdf", mimetype="application/pdf")
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3000, debug=True)

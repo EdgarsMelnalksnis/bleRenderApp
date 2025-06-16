@@ -19,7 +19,7 @@
                     <select name="mac" class="form-select" required>
                         {% for mac in macs %}
                             {% set name = mac_stats.get(mac, {}).get('name', '') %}
-                            <option value="{{ mac }}">{{ mac }}{% if name %} ({{ name }}){% endif %}</option>
+                            <option value="{{ mac_name_map.get(mac, mac) }}">{{ mac_name_map.get(mac, mac) }}{% if name %} ({{ name }}){% endif %}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -29,9 +29,9 @@
                     {% for hub in hubs %}
 		        {% set hub_name = hub_stats.get(hub, {}).get('name', '') %}
         		<div class="form-check form-check-inline">
-            			<input type="checkbox" name="hub" value="{{ hub }}" class="form-check-input">
+            			<input type="checkbox" name="hub" value="{{ hub_name_map.get(hub, hub) }}" class="form-check-input">
             			<label class="form-check-label">
-                			{{ hub }}{% if hub_name %} ({{ hub_name }}){% endif %}
+                			{{ hub_name_map.get(hub, hub) }}{% if hub_name %} ({{ hub_name }}){% endif %}
             			</label>
         		</div>
                     {% endfor %}
@@ -87,7 +87,7 @@
                     <select name="hub" class="form-select" required>
                         {% for hub in hubs %}
                             {% set name = hub_stats.get(hub, {}).get('name', '') %}
-                            <option value="{{ hub }}">{{ hub }}{% if name %} ({{ name }}){% endif %}</option>
+                            <option value="{{ hub_name_map.get(hub, hub) }}">{{ hub_name_map.get(hub, hub) }}{% if name %} ({{ name }}){% endif %}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -132,8 +132,8 @@
             <tbody>
                 {% for mac, info in mac_stats.items() %}
                 <tr>
-                    <td>{{ mac }}</td>
-                    <td><input type="text" class="form-control" name="rename_{{ mac }}" value="{{ info.name }}"></td>
+                    <td>{{ mac_name_map.get(mac, mac) }}</td>
+                    <td><input type="text" class="form-control" name="rename_{{ mac_name_map.get(mac, mac) }}" value="{{ info.name }}"></td>
                     <td>{{ info.last_seen }}</td>
                     <td>{{ info.today_count }}</td>
                     <td>{{ info.total_count }}</td>
@@ -160,8 +160,8 @@
             <tbody>
                 {% for hub, info in hub_stats.items() %}
                 <tr>
-                    <td>{{ hub }}</td>
-                    <td><input type="text" class="form-control" name="renamehub_{{ hub }}" value="{{ info.name }}"></td>
+                    <td>{{ hub_name_map.get(hub, hub) }}</td>
+                    <td><input type="text" class="form-control" name="renamehub_{{ hub_name_map.get(hub, hub) }}" value="{{ info.name }}"></td>
                     <td>{{ info.last_seen }}</td>
                     <td>{{ info.today_count }}</td>
                     <td>{{ info.total_count }}</td>
@@ -179,3 +179,37 @@
 </body>
 </html>
 
+<hr>
+<h2 style="margin-top: 40px;">📊 Generate Daily Report</h2>
+<form action="/report" method="POST" style="margin-top: 20px; font-family: Arial, sans-serif;">
+    <div style="margin-bottom: 20px;">
+        <h4 style="margin-bottom: 10px;">Select Hubs:</h4>
+        <div style="padding-left: 20px;">
+        {% for hub in hubs %}
+            <label style="display: inline-block; margin-right: 10px;">
+                <input type="checkbox" name="hubs" value="{{ hub_name_map.get(hub, hub) }}" checked> {{ hub_name_map.get(hub, hub) }}
+            </label>
+        {% endfor %}
+        </div>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+        <h4 style="margin-bottom: 10px;">Select MAC Addresses:</h4>
+        <div style="max-height: 150px; overflow-y: auto; padding-left: 20px; border: 1px solid #ccc; padding: 10px;">
+        {% for mac in macs %}
+            <label style="display: inline-block; width: 200px; margin-bottom: 5px;">
+                <input type="checkbox" name="macs" value="{{ mac_name_map.get(mac, mac) }}" checked> {{ mac_name_map.get(mac, mac) }}
+            </label>
+        {% endfor %}
+        </div>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+        <h4 style="margin-bottom: 10px;">Select Date:</h4>
+        <input type="date" name="report_date" required style="padding: 6px; font-size: 16px;">
+    </div>
+
+    <button type="submit" style="padding: 10px 20px; font-size: 16px; background-color: #007BFF; color: white; border: none; border-radius: 5px;">
+        Generate Report
+    </button>
+</form>
