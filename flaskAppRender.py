@@ -436,7 +436,7 @@ def generate_report():
 @app.route("/report/download_pdf")
 def download_report_pdf():
     from fpdf import FPDF
-
+    
     date = request.args.get("date")
     hubs = request.args.get("hubs", "").split(",")
     macs = request.args.get("macs", "").split(",")
@@ -444,47 +444,87 @@ def download_report_pdf():
     if not date or not hubs or not macs:
         return "Missing parameters", 400
 
+    # Convert display names back to IDs for filtering
+    hub_name_to_id = {v: k for k, v in hub_name_map.items()}
+    mac_name_to_id = {v: k for k, v in mac_name_map.items()}
+    
+    selected_hub_ids = [hub_name_to_id.get(name, name) for name in hubs]
+    selected_mac_ids = [mac_name_to_id.get(name, name) for name in macs]
+
+    # Filter data
     report_day = datetime.strptime(date, "%Y-%m-%d").date()
     df_filtered = full_df[
-        (full_df["hub"].isin(hubs)) &
-        (full_df["mac"].isin(macs)) &
+        (full_df["hub"].isin(selected_hub_ids)) &
+        (full_df["mac"].isin(selected_mac_ids)) &
         (full_df["time"].dt.date == report_day)
     ]
 
     # Generate report data
     report_data = []
-    for mac in macs:
-        row = {"mac": mac, "counts": {}, "total": 0}
-        for hub in hubs:
-            count = df_filtered[(df_filtered["mac"] == mac) & (df_filtered["hub"] == hub)].shape[0]
-            row["counts"][hub] = count
+    for mac_name in macs:
+        mac_id = mac_name_to_id.get(mac_name, mac_name)
+        row = {"mac": mac_name, "counts": {}, "total": 0}
+        for hub_name in hubs:
+            hub_id = hub_name_to_id.get(hub_name, hub_name)
+            count = df_filtered[
+                (df_filtered["mac"] == mac_id) & 
+                (df_filtered["hub"] == hub_id)
+            ].shape[0]
+            row["counts"][hub_name] = count
             row["total"] += count
         report_data.append(row)
 
-    # Create PDF
+    # Create PDF with Unicode support
     pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
-    pdf.set_font("Arial", size=10)
+    
+    # Add a Unicode-compatible font (make sure the font file exists)
+    try:
+        pdf.add_font('DejaVu', '', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', uni=True)
+        pdf.set_font('DejaVu', '', 10)
+    except:
+        # Fallback to Arial if DejaVu not available (Arial supports some Unicode)
+        pdf.add_font('Arial', '', 'arial.ttf', uni=True)
+        pdf.set_font('Arial', '', 10)
+
     pdf.cell(200, 10, txt=f"MAC Report for {date}", ln=True, align='L')
 
+    # Create header
     header = ["MAC Address"] + hubs + ["Total"]
-    pdf.set_font("Arial", size=9)
-    pdf.cell(0, 8, txt=" | ".join(header), ln=True)
+    col_widths = [40] + [30] * len(hubs) + [20]
+    
+    # Header row
+    pdf.set_fill_color(200, 220, 255)
+    for i, col in enumerate(header):
+        pdf.cell(col_widths[i], 10, txt=col, border=1, fill=True)
+    pdf.ln()
 
+    # Data rows
+    pdf.set_fill_color(255, 255, 255)
     for row in report_data:
-        values = [row["mac"]] + [str(row["counts"].get(hub, 0)) for hub in hubs] + [str(row["total"])]
-        line = " | ".join(values)
-        if pdf.get_string_width(line) > 190:
-            line = line[:180] + "..."
-        pdf.multi_cell(0, 8, line)
+        # MAC Address
+        pdf.cell(col_widths[0], 10, txt=row["mac"], border=1)
+        
+        # Hub counts
+        for i, hub in enumerate(hubs):
+            pdf.cell(col_widths[i+1], 10, txt=str(row["counts"].get(hub, 0)), border=1)
+        
+        # Total
+        pdf.cell(col_widths[-1], 10, txt=str(row["total"]), border=1)
+        pdf.ln()
 
+    # Prepare output
     output = BytesIO()
-    pdf_bytes = pdf.output(dest='S').encode('latin1')
+    try:
+        # Try UTF-8 encoding first
+        pdf_bytes = pdf.output(dest='S').encode('utf-8')
+    except:
+        # Fallback to latin1 if UTF-8 fails (with replacement for unsupported chars)
+        pdf_bytes = pdf.output(dest='S').encode('latin1', errors='replace')
+    
     output.write(pdf_bytes)
     output.seek(0)
     return send_file(output, as_attachment=True, download_name=f"mac_report_{date}.pdf", mimetype="application/pdf")
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3000, debug=True)
