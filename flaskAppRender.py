@@ -150,12 +150,14 @@ def compute_mac_stats():
         last_seen = mac_df["time"].max()
         today_count = mac_df[mac_df["time"].dt.date == today].shape[0]
         total_count = mac_df.shape[0]
-        stats[mac] = {
-            "name": mac_name_map.get(mac, ""),
+        label = mac_name_map.get(mac, mac)
+        stats[label] = {
+            "mac": mac,
             "last_seen": last_seen.strftime("%Y-%m-%d %H:%M:%S") if pd.notnull(last_seen) else "—",
             "today_count": today_count,
             "total_count": total_count
         }
+    print("MAC_STATS DEBUG:", stats)
     return stats
 
 def compute_hub_stats():
@@ -370,45 +372,66 @@ def rename_hubs():
     upload_json_to_drive("hub_names.json", hub_name_map)
     return redirect("/")
 
-
 @app.route('/report', methods=['POST'])
 def generate_report():
-    selected_hubs = request.form.getlist('hubs')
-    selected_macs = request.form.getlist('macs')
+    # Get form data
+    selected_hub_names = request.form.getlist('hubs')  # Display names from form
+    selected_mac_names = request.form.getlist('macs')  # Display names from form
     report_date = request.form.get('report_date')
 
-    if not selected_hubs or not selected_macs or not report_date:
+    if not selected_hub_names or not selected_mac_names or not report_date:
         return "Missing data", 400
 
-    # Filter data for that date
+    # Create reverse mappings
+    mac_name_to_id = {v: k for k, v in mac_name_map.items()}
+    hub_name_to_id = {v: k for k, v in hub_name_map.items()}
+
+    # Convert display names back to original IDs
+    selected_hub_ids = [hub_name_to_id.get(name, name) for name in selected_hub_names]
+    selected_mac_ids = [mac_name_to_id.get(name, name) for name in selected_mac_names]
+
+    # Filter data
     report_day = datetime.strptime(report_date, "%Y-%m-%d").date()
     df_filtered = full_df[
-        (full_df["hub"].isin(selected_hubs)) &
-        (full_df["mac"].isin(selected_macs)) &
+        (full_df["hub"].isin(selected_hub_ids)) &
+        (full_df["mac"].isin(selected_mac_ids)) &
         (full_df["time"].dt.date == report_day)
     ]
 
-    # Prepare count table
+    # Prepare report data
     report_data = []
-    for mac in selected_macs:
-        row = {"mac": mac, "counts": {}, "total": 0}
-        for hub in selected_hubs:
-            count = df_filtered[(df_filtered["mac"] == mac) & (df_filtered["hub"] == hub)].shape[0]
-            row["counts"][hub] = count
+    for mac_name in selected_mac_names:
+        mac_id = mac_name_to_id.get(mac_name, mac_name)
+        row = {
+            "mac": mac_name,  # Use display name for report
+            "counts": {},
+            "total": 0
+        }
+        for hub_name in selected_hub_names:
+            hub_id = hub_name_to_id.get(hub_name, hub_name)
+            count = df_filtered[
+                (df_filtered["mac"] == mac_id) &
+                (df_filtered["hub"] == hub_id)
+            ].shape[0]
+            row["counts"][hub_name] = count
             row["total"] += count
         report_data.append(row)
 
+    # Debug output
+    print("\n=== DEBUG REPORT ===")
+    print("Selected Hub Names:", selected_hub_names)
+    print("Selected Hub IDs:", selected_hub_ids)
+    print("Selected MAC Names:", selected_mac_names)
+    print("Selected MAC IDs:", selected_mac_ids)
+    print("Filtered Data Count:", len(df_filtered))
+    print("Report Data:", report_data)
+
     return render_template("report_result.html",
         report_date=report_date,
-        hubs=selected_hubs,
+        hubs=selected_hub_names,
         report_data=report_data,
-        selected_hubs=selected_hubs,
-        selected_macs=selected_macs
-    ,
-        mac_name_map=mac_name_map,
-        hub_name_map=hub_name_map)
-
-
+        mac_name_map=mac_name_map
+    )
 
 @app.route("/report/download_pdf")
 def download_report_pdf():

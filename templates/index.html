@@ -213,3 +213,26 @@
         Generate Report
     </button>
 </form>
+
+<hr>
+<h2 style="margin-top: 40px;">📈 MAC Stats</h2>
+<table border="1" cellpadding="8" cellspacing="0">
+    <thead>
+        <tr>
+            <th>MAC Name</th>
+            <th>Last Seen</th>
+            <th>Today Count</th>
+            <th>Total Count</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for name, stats in mac_stats.items() %}
+        <tr>
+            <td>{{ name }}</td>
+            <td>{{ stats.last_seen }}</td>
+            <td>{{ stats.today_count }}</td>
+            <td>{{ stats.total_count }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
