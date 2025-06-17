@@ -157,7 +157,7 @@ def compute_mac_stats():
             "today_count": today_count,
             "total_count": total_count
         }
-    print("MAC_STATS DEBUG:", stats)
+    #print("MAC_STATS DEBUG:", stats)
     return stats
 
 def compute_hub_stats():
@@ -418,13 +418,13 @@ def generate_report():
         report_data.append(row)
 
     # Debug output
-    print("\n=== DEBUG REPORT ===")
-    print("Selected Hub Names:", selected_hub_names)
-    print("Selected Hub IDs:", selected_hub_ids)
-    print("Selected MAC Names:", selected_mac_names)
-    print("Selected MAC IDs:", selected_mac_ids)
-    print("Filtered Data Count:", len(df_filtered))
-    print("Report Data:", report_data)
+    #print("\n=== DEBUG REPORT ===")
+    #print("Selected Hub Names:", selected_hub_names)
+    #print("Selected Hub IDs:", selected_hub_ids)
+    #print("Selected MAC Names:", selected_mac_names)
+    #print("Selected MAC IDs:", selected_mac_ids)
+    #print("Filtered Data Count:", len(df_filtered))
+    #print("Report Data:", report_data)
 
     return render_template("report_result.html",
         report_date=report_date,
