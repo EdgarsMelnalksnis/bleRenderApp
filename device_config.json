@@ -1,0 +1,28 @@
+{
+  "mode": "normal",
+  "server_update_interval": 60,
+  "tag_filter_interval": 60,
+  "start_sleep": "20:00",
+  "end_sleep": "06:00",
+  "low_power_mode": true,
+  "led_enable": true,
+  "mac_list": [
+    "DC2C6E7B12B2",
+    "DC2C6E7B174F",
+    "DC2C6E7B1240",
+    "DC2C6E7B179A",
+    "DC2C6E7B17C8",
+    "DC2C6E7B1495",
+    "DC2C6E7B1A55",
+    "DC2C6E7B166F",
+    "DC2C6E7B153F",
+    "DC2C6E7B171D",
+    "DC2C6E7B1688",
+    "DC2C6E7B12AC",
+    "DC2C6E7B1556",
+    "DC2C6E7B1761",
+    "DC2C6E6A1ABC",
+    "DC2C6E7B19DA",
+    "DC2C6E7B1755"
+  ]
+}

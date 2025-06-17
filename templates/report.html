@@ -1,0 +1,43 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .section { margin-bottom: 20px; }
+        .checkbox-group { margin-left: 20px; }
+        .submit-btn { padding: 10px 20px; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <h1>Generate Report</h1>
+
+    <form action="/report" method="POST">
+        <div class="section">
+            <h3>Select Hubs</h3>
+            <div class="checkbox-group">
+                {% for hub in hubs %}
+                    <label><input type="checkbox" name="hubs" value="{{ hub }}"> {{ hub }}</label><br>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Select MAC Addresses</h3>
+            <div class="checkbox-group">
+                {% for mac in macs %}
+                    <label><input type="checkbox" name="macs" value="{{ mac }}"> {{ mac }}</label><br>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Select Date</h3>
+            <input type="date" name="report_date" required>
+        </div>
+
+        <button class="submit-btn" type="submit">Generate Report</button>
+    </form>
+</body>
+</html>

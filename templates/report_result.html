@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Report Results</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .download-btn {
+            margin-top: 20px;
+            margin-bottom: 30px;
+        }
+        .report-table {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body class="bg-light">
+<div class="container py-5">
+    <h1>Report for {{ report_date }}</h1>
+    <a href="/" class="btn btn-secondary mb-3">← Back</a>
+
+    <table class="table table-bordered table-hover report-table">
+        <thead class="table-light">
+            <tr>
+                <th>MAC Address</th>
+                {% for hub in hubs %}
+                    <th>{{ hub }}</th>
+                {% endfor %}
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in report_data %}
+            <tr>
+                <td>{{ row.mac }}</td>
+                {% for hub in hubs %}
+                    <td>{{ row.counts.get(hub, 0) }}</td>
+                {% endfor %}
+                <td>{{ row.total }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <a href="{{ url_for('download_report_pdf', date=report_date, hubs=hubs|join(','), macs=selected_macs|join(',')) }}" 
+       class="btn btn-primary download-btn">
+        Download PDF Report
+    </a>
+</div>
+</body>
+</html>
