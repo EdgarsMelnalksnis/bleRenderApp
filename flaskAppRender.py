@@ -151,7 +151,7 @@ def compute_mac_stats():
         today_count = mac_df[mac_df["time"].dt.date == today].shape[0]
         total_count = mac_df.shape[0]
         label = mac_name_map.get(mac, mac)
-        stats[label] = {
+        stats[mac] = {
             "mac": mac,
             "last_seen": last_seen.strftime("%Y-%m-%d %H:%M:%S") if pd.notnull(last_seen) else "—",
             "today_count": today_count,

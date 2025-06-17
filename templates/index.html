@@ -91,21 +91,25 @@
                     <th>Total</th>
                 </tr>
             </thead>
-            <tbody>
+	    <tbody>
 {% for mac in macs %}
 <tr>
-    <td>{{ mac }}</td>
-    <td>{{ mac_name_map.get(mac, '') }}</td>
-    <td>
-        <form method="POST" action="/rename_mac">
-            <input type="hidden" name="mac" value="{{ mac }}">
-            <input type="text" name="new_name" value="{{ mac_name_map.get(mac, '') }}" class="form-control">
-            <button type="submit" class="btn btn-sm btn-primary mt-1">Save</button>
-        </form>
-    </td>
+  <td>{{ mac }}</td>
+  <td>{{ mac_name_map.get(mac, '') }}</td>
+  <td>{{ mac_stats.get(mac, {}).get('last_seen', '—') }}</td>
+  <td>{{ mac_stats.get(mac, {}).get('today_count', 0) }}</td>
+  <td>{{ mac_stats.get(mac, {}).get('total_count', 0) }}</td>
+  <td>
+    <form method="POST" action="/rename_mac">
+      <input type="hidden" name="mac" value="{{ mac }}">
+      <input type="text" name="new_name" value="{{ mac_name_map.get(mac, '') }}" class="form-control">
+      <button type="submit" class="btn btn-sm btn-primary mt-1">Save</button>
+    </form>
+  </td>
 </tr>
 {% endfor %}
 </tbody>
+
         </table>
         <button class="btn btn-primary">💾 Save MAC Names</button>
     </form>
@@ -123,21 +127,25 @@
                     <th>Total</th>
                 </tr>
             </thead>
-            <tbody>
-{% for mac in macs %}
+	    <tbody>
+{% for hub in hubs %}
 <tr>
-    <td>{{ mac }}</td>
-    <td>{{ mac_name_map.get(mac, '') }}</td>
-    <td>
-        <form method="POST" action="/rename_mac">
-            <input type="hidden" name="mac" value="{{ mac }}">
-            <input type="text" name="new_name" value="{{ mac_name_map.get(mac, '') }}" class="form-control">
-            <button type="submit" class="btn btn-sm btn-primary mt-1">Save</button>
-        </form>
-    </td>
+  <td>{{ hub }}</td>
+  <td>{{ hub_name_map.get(hub, '') }}</td>
+  <td>{{ hub_stats.get(hub, {}).get('last_seen', '—') }}</td>
+  <td>{{ hub_stats.get(hub, {}).get('today_count', 0) }}</td>
+  <td>{{ hub_stats.get(hub, {}).get('total_count', 0) }}</td>
+  <td>
+    <form method="POST" action="/rename_hub">
+      <input type="hidden" name="hub" value="{{ hub }}">
+      <input type="text" name="new_name" value="{{ hub_name_map.get(hub, '') }}" class="form-control">
+      <button type="submit" class="btn btn-sm btn-primary mt-1">Save</button>
+    </form>
+  </td>
 </tr>
 {% endfor %}
 </tbody>
+
         </table>
         <button class="btn btn-success">💾 Save Hub Names</button>
     </form>
@@ -183,26 +191,3 @@
         Generate Report
     </button>
 </form>
-
-<hr>
-<h2 style="margin-top: 40px;">📈 MAC Stats</h2>
-<table border="1" cellpadding="8" cellspacing="0">
-    <thead>
-        <tr>
-            <th>MAC Name</th>
-            <th>Last Seen</th>
-            <th>Today Count</th>
-            <th>Total Count</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for name, stats in mac_stats.items() %}
-        <tr>
-            <td>{{ name }}</td>
-            <td>{{ stats.last_seen }}</td>
-            <td>{{ stats.today_count }}</td>
-            <td>{{ stats.total_count }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
